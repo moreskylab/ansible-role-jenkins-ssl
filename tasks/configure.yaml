@@ -1,0 +1,180 @@
+---
+- name: Ensure Jenkins home directory exists with correct permissions
+  file:
+    path: "{{ jenkins_home }}"
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+    mode: 0755
+    state: directory
+
+- name: Set Jenkins init file variables (Debian)
+  lineinfile:
+    dest: /etc/default/jenkins
+    regexp: "^{{ item.option }}="
+    line: "{{ item.option }}=\"{{ item.value }}\""
+    state: present
+    create: yes
+  with_items: "{{ jenkins_init_changes }}"
+  notify: restart jenkins
+  when: ansible_os_family == "Debian"
+
+- name: Set Jenkins init file variables (RedHat)
+  lineinfile:
+    dest: /etc/sysconfig/jenkins
+    regexp: "^{{ item.option }}="
+    line: "{{ item.option }}=\"{{ item.value }}\""
+    state: present
+    create: yes
+  with_items: "{{ jenkins_init_changes }}"
+  notify: restart jenkins
+  when: ansible_os_family == "RedHat"
+
+# Check if Jenkins is installed
+- name: Check if Jenkins is already configured
+  stat:
+    path: "{{ jenkins_home }}/.jenkins_setup_complete"
+  register: jenkins_binary
+
+- name: Wait for Jenkins to start up
+  uri:
+    url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}/cli/"
+    status_code: 200
+    timeout: 5
+  register: result
+  until: result.status == 200
+  retries: 60
+  delay: 5
+  when: not jenkins_disable_http | bool
+
+- name: Check if initial admin password file exists
+  stat:
+    path: "{{ jenkins_home }}/secrets/initialAdminPassword"
+  register: initial_password_file
+  when: not jenkins_binary.stat.exists
+
+- name: Get Jenkins initial admin password
+  slurp:
+    src: "{{ jenkins_home }}/secrets/initialAdminPassword"
+  become: true
+  become_method: sudo
+  register: jenkins_initial_password_file
+  when: not jenkins_binary.stat.exists and initial_password_file.stat.exists
+
+- name: Set default initial password if file doesn't exist
+  set_fact:
+    jenkins_initial_password: "{{ jenkins_admin_password }}"
+  when: not jenkins_binary.stat.exists and not initial_password_file.stat.exists
+
+- name: Set initial password from file when available
+  set_fact:
+    jenkins_initial_password: "{{ jenkins_initial_password_file.content | b64decode | trim }}"
+  when: not jenkins_binary.stat.exists and initial_password_file.stat.exists
+
+- name: Set Jenkins admin password
+  jenkins_script:
+    url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}"
+    script: |
+      import jenkins.model.*
+      import hudson.security.*
+
+      def instance = Jenkins.getInstance()
+
+      def hudsonRealm = new HudsonPrivateSecurityRealm(false)
+      hudsonRealm.createAccount('{{ jenkins_admin_username }}', '{{ jenkins_admin_password }}')
+      instance.setSecurityRealm(hudsonRealm)
+
+      def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+      strategy.setAllowAnonymousRead(false)
+      instance.setAuthorizationStrategy(strategy)
+
+      instance.save()
+    user: "{{ jenkins_admin_username }}"
+    password: "{{ jenkins_initial_password }}"
+  when: not jenkins_binary.stat.exists and not jenkins_disable_http | bool
+  ignore_errors: true
+
+- name: Wait for Jenkins to be fully operational
+  uri:
+    url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}/login"
+    status_code: 200
+    timeout: 5
+  register: result
+  until: result.status == 200
+  retries: 60
+  delay: 5
+  when: not jenkins_disable_http | bool
+
+- name: Get Jenkins CLI
+  get_url:
+    url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}/jnlpJars/jenkins-cli.jar"
+    dest: "/tmp/jenkins-cli.jar"
+    mode: '0440'
+  when: not jenkins_disable_http | bool
+  register: cli_download
+  retries: 5
+  delay: 5
+  until: cli_download is success
+
+- name: Generate API token for admin user
+  jenkins_script:
+    url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}"
+    script: |
+      import jenkins.model.*
+      import hudson.security.*
+      import jenkins.security.*
+      import jenkins.security.apitoken.*
+      
+      def user = Jenkins.instance.getSecurityRealm().loadUserByUsername('{{ jenkins_admin_username }}')
+      def tokenStore = user.getProperty(ApiTokenProperty.class)
+      def result = tokenStore.tokenStore.generateNewToken('ansible-token')
+      println(result.plainValue)
+    user: "{{ jenkins_admin_username }}"
+    password: "{{ jenkins_admin_password }}"
+  register: api_token_result
+  when: not jenkins_disable_http | bool
+  no_log: true
+
+- name: Verify API token generation
+  debug:
+    msg: "API token was successfully generated"
+  when: not jenkins_disable_http | bool and api_token_result is defined and api_token_result.output is defined
+
+- name: Install Jenkins plugins
+  jenkins_plugin:
+    name: "{{ item }}"
+    url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}"
+    jenkins_home: "{{ jenkins_home }}"
+    url_username: "{{ jenkins_admin_username }}"
+    url_password: "{{ api_token_result.output | default('') | trim }}"
+    state: present
+    with_dependencies: true
+    timeout: 180
+  with_items: "{{ jenkins_plugins }}"
+  notify: restart jenkins
+  when: not jenkins_disable_http | bool and api_token_result is defined and api_token_result.output is defined
+  
+# If token generation fails, add better error reporting
+- name: Check if token generation failed
+  debug:
+    msg: "Failed to generate API token. Will try fallback method."
+  when: not jenkins_disable_http | bool and (api_token_result is not defined or api_token_result.output is not defined)
+  
+# Fallback method if the above fails
+- name: Install Jenkins plugins using CLI (fallback)
+  command: >
+    java -jar /tmp/jenkins-cli.jar 
+    -s http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}/ 
+    -auth {{ jenkins_admin_username }}:{{ jenkins_admin_password }}
+    install-plugin {{ item }} -deploy
+  with_items: "{{ jenkins_plugins }}"
+  notify: restart jenkins
+  when: not jenkins_disable_http | bool and (api_token_result is not defined or api_token_result.output is not defined)
+
+- name: Create setup complete marker file
+  file:
+    path: "{{ jenkins_home }}/.jenkins_setup_complete"
+    state: touch
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+    mode: 0644
+  when: not jenkins_binary.stat.exists

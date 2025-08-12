@@ -1,0 +1,5 @@
+---
+jenkins_repo_key_url_debian: "https://pkg.jenkins.io/debian/jenkins.io-2023.key"
+jenkins_repo_url_debian: "deb https://pkg.jenkins.io/debian binary/"
+jenkins_repo_key_url_redhat: "https://pkg.jenkins.io/redhat/jenkins.io-2023.key"
+jenkins_repo_url_redhat: "https://pkg.jenkins.io/redhat-stable"

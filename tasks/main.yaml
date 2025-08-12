@@ -1,0 +1,32 @@
+---
+- name: Include OS-specific variables
+  include_vars: "{{ item }}"
+  with_first_found:
+    - "{{ ansible_distribution | lower }}-{{ ansible_distribution_version }}.yaml"
+    - "{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version }}.yaml"
+    - "{{ ansible_distribution | lower }}.yaml"
+    - "{{ ansible_os_family | lower }}.yaml"
+  ignore_errors: true
+
+
+
+
+
+- name: Check if Jenkins is already installed
+  stat:
+    path: "/usr/bin/jenkins"
+  register: jenkins_binary
+
+- name: Include installation tasks
+  include_tasks: install.yaml
+  when: not jenkins_binary.stat.exists
+
+- name: Include configuration tasks
+  include_tasks: configure.yaml
+
+- name: Include SSL configuration tasks
+  include_tasks: ssl.yaml
+  when: jenkins_enable_ssl | bool
+
+- name: Include service management tasks
+  include_tasks: service.yaml

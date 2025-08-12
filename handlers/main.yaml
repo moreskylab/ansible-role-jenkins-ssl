@@ -1,0 +1,12 @@
+---
+- name: restart jenkins
+  service:
+    name: jenkins
+    state: restarted
+  listen: "restart jenkins"
+
+- name: reload jenkins
+  service:
+    name: jenkins
+    state: reloaded
+  listen: "reload jenkins"

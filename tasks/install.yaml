@@ -1,0 +1,76 @@
+---
+- name: Debian install block
+  block:
+  - name: Install dependencies (Debian/Ubuntu)
+    package:
+      name:
+        - apt-transport-https
+        - ca-certificates
+        - openjdk-21-jdk
+        - curl
+        - gnupg
+        - python3-full
+        - python3-pip
+        - python3-jenkins
+      state: present
+
+  - name: Add Jenkins repository key (Debian)
+    apt_key:
+      url: "{{ jenkins_repo_key_url }}"
+      state: present
+
+  - name: Add Jenkins repository (Debian)
+    apt_repository:
+      repo: "{{ jenkins_repo_url }}"
+      state: present
+
+  - name: Update (Debian)
+    apt:
+      name: "*"
+      state: latest
+
+  - name: Install Jenkins
+    apt:
+      name: "jenkins={{ jenkins_version }}"
+      state: present
+      update_cache: yes
+
+  when: ansible_os_family == "Debian"
+
+
+- name: RedHat install block
+  block:
+  - name: Install dependencies (RedHat)
+    package:
+      name:
+        - java-21-openjdk-devel
+        - curl
+        - gnupg2
+        - python3-full
+        - python3-pip
+        - python3-jenkins
+      state: present
+
+  - name: Add Jenkins repository (RedHat)
+    get_url:
+      url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+      dest: /etc/yum.repos.d/jenkins.repo
+      mode: 0644
+
+  - name: Import Jenkins GPG key (RedHat)
+    rpm_key:
+      key: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+      state: present
+
+  - name: Update (RedHat)
+    dnf:
+      name: "*"
+      state: latest
+
+  - name: Install Jenkins
+    dnf:
+      name: "jenkins-{{ jenkins_version }}.1-1.1"
+      state: present
+      update_cache: yes
+
+  when: ansible_os_family == "RedHat"

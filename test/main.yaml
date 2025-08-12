@@ -1,0 +1,6 @@
+---
+- hosts: jenkins_servers
+  vars_files:
+    - vars/vault.yml
+  roles:
+    - ansible-role-jenkins

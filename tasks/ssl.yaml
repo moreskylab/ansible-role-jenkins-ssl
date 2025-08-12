@@ -1,0 +1,200 @@
+---
+- name: Install SSL related packages
+  package:
+    name:
+      - openssl
+      - default-jre
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Install SSL related packages (RedHat)
+  package:
+    name:
+      - openssl
+      - java-11-openjdk
+    state: present
+  when: ansible_os_family == "RedHat"
+
+# Self-signed certificate workflow
+- block:
+    - name: Create directory for SSL files
+      file:
+        path: "{{ jenkins_home }}/ssl"
+        state: directory
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_group }}"
+        mode: 0700
+
+    - name: Generate private key
+      openssl_privatekey:
+        path: "{{ jenkins_home }}/ssl/jenkins.key"
+        size: 4096
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_group }}"
+        mode: 0600
+
+    - name: Generate CSR
+      openssl_csr:
+        path: "{{ jenkins_home }}/ssl/jenkins.csr"
+        privatekey_path: "{{ jenkins_home }}/ssl/jenkins.key"
+        common_name: "{{ jenkins_ssl_cert_common_name }}"
+        country_name: "{{ jenkins_ssl_cert_country }}"
+        state_or_province_name: "{{ jenkins_ssl_cert_state }}"
+        locality_name: "{{ jenkins_ssl_cert_locality }}"
+        organization_name: "{{ jenkins_ssl_cert_organization }}"
+        organizational_unit_name: "{{ jenkins_ssl_cert_organizational_unit }}"
+        email_address: "{{ jenkins_ssl_cert_email }}"
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_group }}"
+
+    - name: Generate self-signed certificate
+      openssl_certificate:
+        path: "{{ jenkins_home }}/ssl/jenkins.crt"
+        privatekey_path: "{{ jenkins_home }}/ssl/jenkins.key"
+        csr_path: "{{ jenkins_home }}/ssl/jenkins.csr"
+        provider: selfsigned
+        selfsigned_not_after: "+{{ jenkins_ssl_cert_validity_days }}d"
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_group }}"
+  when: jenkins_ssl_cert_strategy == "selfsigned"
+
+# Provided certificate workflow
+- block:
+    - name: Create directory for SSL files
+      file:
+        path: "{{ jenkins_home }}/ssl"
+        state: directory
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_group }}"
+        mode: 0700
+
+    - name: Copy certificate files
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_group }}"
+        mode: 0600
+      with_items:
+        - { src: "{{ jenkins_ssl_cert_file }}", dest: "{{ jenkins_home }}/ssl/jenkins.crt" }
+        - { src: "{{ jenkins_ssl_key_file }}", dest: "{{ jenkins_home }}/ssl/jenkins.key" }
+        - { src: "{{ jenkins_ssl_chain_file }}", dest: "{{ jenkins_home }}/ssl/jenkins-chain.crt" }
+      when: jenkins_ssl_cert_file != "" and jenkins_ssl_key_file != ""
+  when: jenkins_ssl_cert_strategy == "provided"
+
+# Let's Encrypt certificate workflow
+- block:
+    - name: Create directory for SSL files
+      file:
+        path: "{{ jenkins_home }}/ssl"
+        state: directory
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_group }}"
+        mode: 0700
+
+    - name: Create Let's Encrypt account key
+      openssl_privatekey:
+        path: "{{ jenkins_home }}/ssl/letsencrypt_account.key"
+        size: 4096
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_group }}"
+        mode: 0600
+
+    - name: Create private key for certificate
+      openssl_privatekey:
+        path: "{{ jenkins_home }}/ssl/jenkins.key"
+        size: 4096
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_group }}"
+        mode: 0600
+
+    - name: Create CSR for Let's Encrypt certificate
+      openssl_csr:
+        path: "{{ jenkins_home }}/ssl/jenkins.csr"
+        privatekey_path: "{{ jenkins_home }}/ssl/jenkins.key"
+        common_name: "{{ jenkins_letsencrypt_domain }}"
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_group }}"
+
+    - name: Obtain Let's Encrypt certificate
+      community.crypto.acme_certificate:
+        account_key_src: "{{ jenkins_home }}/ssl/letsencrypt_account.key"
+        acme_directory: "https://acme-v02.api.letsencrypt.org/directory"
+        acme_version: 2
+        challenge: http-01
+        csr: "{{ jenkins_home }}/ssl/jenkins.csr"
+        dest: "{{ jenkins_home }}/ssl/jenkins.crt"
+        fullchain_dest: "{{ jenkins_home }}/ssl/jenkins-chain.crt"
+        remaining_days: 30
+        terms_agreed: true
+        http_01_port: "{{ jenkins_http_port }}"
+        http_01_bind: "0.0.0.0"
+      register: letsencrypt_cert
+
+    - name: Ensure certificate file permissions
+      file:
+        path: "{{ item }}"
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_group }}"
+        mode: 0600
+      with_items:
+        - "{{ jenkins_home }}/ssl/jenkins.crt"
+        - "{{ jenkins_home }}/ssl/jenkins-chain.crt"
+  when: jenkins_ssl_cert_strategy == "letsencrypt"
+
+# Convert certificate to PKCS12 format
+- name: Convert certificate to PKCS12
+  openssl_pkcs12:
+    action: export
+    path: "{{ jenkins_home }}/ssl/jenkins.p12"
+    friendly_name: jenkins
+    privatekey_path: "{{ jenkins_home }}/ssl/jenkins.key"
+    certificate_path: "{{ jenkins_home }}/ssl/jenkins.crt"
+    other_certificates: "{{ (jenkins_home + '/ssl/jenkins-chain.crt') if (jenkins_ssl_cert_strategy == 'provided' or jenkins_ssl_cert_strategy == 'letsencrypt') else omit }}"
+    passphrase: "{{ jenkins_ssl_keystore_password }}"
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+    mode: 0600
+  when: jenkins_ssl_cert_strategy in ["selfsigned", "provided", "letsencrypt"]
+
+# Convert PKCS12 to Java KeyStore (JKS)
+- name: Convert PKCS12 to JKS
+  command: >
+    keytool -importkeystore 
+    -srckeystore {{ jenkins_home }}/ssl/jenkins.p12 
+    -srcstoretype PKCS12 
+    -srcstorepass {{ jenkins_ssl_keystore_password }} 
+    -destkeystore {{ jenkins_ssl_keystore_path }} 
+    -deststoretype JKS 
+    -deststorepass {{ jenkins_ssl_keystore_password }}
+    -noprompt
+  args:
+    creates: "{{ jenkins_ssl_keystore_path }}"
+  become: true
+  become_user: "{{ jenkins_user }}"
+  when: jenkins_ssl_cert_strategy in ["selfsigned", "provided", "letsencrypt"]
+
+# Configure Jenkins for SSL
+- name: Update Jenkins init file for SSL (Debian)
+  lineinfile:
+    dest: /etc/default/jenkins
+    regexp: "^{{ item.option }}="
+    line: "{{ item.option }}=\"{{ item.value }}\""
+    state: present
+  with_items:
+    - option: "JENKINS_ARGS"
+      value: "--prefix={{ jenkins_context_path }} {% if not jenkins_disable_http %}--httpPort={{ jenkins_http_port }}{% else %}--httpPort=-1{% endif %} --httpsPort={{ jenkins_https_port }} --httpsKeyStore={{ jenkins_ssl_keystore_path }} --httpsKeyStorePassword={{ jenkins_ssl_keystore_password }}"
+  notify: restart jenkins
+  when: ansible_os_family == "Debian"
+
+- name: Update Jenkins init file for SSL (RedHat)
+  lineinfile:
+    dest: /etc/sysconfig/jenkins
+    regexp: "^{{ item.option }}="
+    line: "{{ item.option }}=\"{{ item.value }}\""
+    state: present
+  with_items:
+    - option: "JENKINS_ARGS"
+      value: "--prefix={{ jenkins_context_path }} {% if not jenkins_disable_http %}--httpPort={{ jenkins_http_port }}{% else %}--httpPort=-1{% endif %} --httpsPort={{ jenkins_https_port }} --httpsKeyStore={{ jenkins_ssl_keystore_path }} --httpsKeyStorePassword={{ jenkins_ssl_keystore_password }}"
+  notify: restart jenkins
+  when: ansible_os_family == "RedHat"

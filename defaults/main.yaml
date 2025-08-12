@@ -1,0 +1,65 @@
+---
+# Jenkins version and installation
+jenkins_version: "2.516"  # LTS version
+jenkins_repo_key_url: "https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key"
+jenkins_repo_url: "deb https://pkg.jenkins.io/debian-stable binary/"
+jenkins_home: "/var/lib/jenkins"
+jenkins_user: "jenkins"
+jenkins_group: "jenkins"
+jenkins_http_port: 8080
+jenkins_context_path: ""
+
+# SSL Configuration
+jenkins_enable_ssl: true
+jenkins_https_port: 8443
+jenkins_ssl_keystore_path: "{{ jenkins_home }}/jenkins.jks"
+jenkins_ssl_keystore_password: "changeme"  # Should be overridden in vault
+jenkins_disable_http: false  # Set to true to disable HTTP access
+
+# SSL Certificate options
+jenkins_ssl_cert_strategy: "letsencrypt"  # Options: selfsigned, provided, letsencrypt
+
+# Let's Encrypt specific settings
+jenkins_letsencrypt_email: "admin@example.com"  # Contact email for Let's Encrypt notifications
+jenkins_letsencrypt_domain: "{{ ansible_fqdn }}"  # Domain for Let's Encrypt certificate
+jenkins_letsencrypt_staging: false  # Set to true to use Let's Encrypt staging environment for testing
+jenkins_letsencrypt_renewal_days: 30  # Renew certificate when this many days remain
+jenkins_letsencrypt_account_key: "{{ jenkins_home }}/ssl/letsencrypt_account.key"  # Location of Let's Encrypt account key
+
+# Self-signed certificate settings
+jenkins_ssl_cert_country: "US"
+jenkins_ssl_cert_state: "State"
+jenkins_ssl_cert_locality: "City"
+jenkins_ssl_cert_organization: "Company"
+jenkins_ssl_cert_organizational_unit: "IT"
+jenkins_ssl_cert_common_name: "{{ ansible_fqdn }}"
+jenkins_ssl_cert_email: "admin@example.com"
+jenkins_ssl_cert_validity_days: 3650  # 10 years for self-signed
+
+# For provided certificates
+jenkins_ssl_cert_file: ""  # Path to certificate file to copy
+jenkins_ssl_key_file: ""   # Path to private key file to copy
+jenkins_ssl_chain_file: "" # Path to certificate chain file to copy
+
+# System configuration
+jenkins_java_options: "-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false"
+jenkins_init_changes:
+  - option: "JENKINS_ARGS"
+    value: "--prefix={{ jenkins_context_path }} --httpPort={{ jenkins_http_port }}"
+  - option: "JAVA_ARGS"
+    value: "{{ jenkins_java_options }}"
+
+# Jenkins initial admin credentials
+jenkins_admin_username: "admin"
+jenkins_admin_password: "admin"  # Should be overridden in vault
+jenkins_admin_password_file: ""  # Path to file containing admin password
+
+# Plugins to install
+jenkins_plugins:
+  - git
+  - workflow-aggregator
+  - pipeline-stage-view
+  - blueocean
+  - credentials
+  - ssh
+  - matrix-auth

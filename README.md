@@ -1,2 +1,2 @@
-# ansible-role-jenkins-ssl
-ansible role for jenkins with ssl
+# ansible-role-jenkins
+ansible jenkins role
