@@ -1,9 +1,9 @@
 ---
 galaxy_info:
-  role_name: jenkins
-  author: Your Name
+  role_name: jenkins-ssl
+  author: Ankush More
   description: Installs and configures Jenkins with SSL
-  company: Your Company
+  company: Altgr
   license: MIT
   min_ansible_version: 2.9
   platforms:
