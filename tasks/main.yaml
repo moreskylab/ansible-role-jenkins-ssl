@@ -9,12 +9,11 @@
   ignore_errors: true
 
 
-- name: Set hostname 
-  set_fact:
-    ansible_fqdn: "{{ jenkins_domain }}"
-
 - name: hostnamectl set-hostname
-  command: hostnamectl set-hostname {{ ansible_fqdn }}
+  command: hostnamectl set-hostname {{ jenkins_domain }}
+
+- name: re gather facts
+  setup:
 
 - name: Check if Jenkins is already installed
   stat:
