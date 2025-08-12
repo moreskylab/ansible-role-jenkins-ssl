@@ -31,7 +31,7 @@
 
   - name: Install Jenkins
     apt:
-      name: "jenkins={{ jenkins_version }}"
+      name: "jenkins={{ jenkins_version }}*"
       state: present
       update_cache: yes
 
