@@ -82,17 +82,6 @@
   when: not jenkins_binary.stat.exists and not jenkins_disable_http | bool
   ignore_errors: true
 
-- name: Wait for Jenkins to be fully operational
-  uri:
-    url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}/login"
-    status_code: 200
-    timeout: 5
-  register: result
-  until: result.status == 200
-  retries: 60
-  delay: 5
-  when: not jenkins_disable_http | bool
-
 - name: Get Jenkins CLI
   get_url:
     url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}/jnlpJars/jenkins-cli.jar"
@@ -122,10 +111,25 @@
   register: api_token_result
   when: not jenkins_disable_http | bool
   no_log: true
+  ignore_errors: true
+
+- name: New Generate new API token
+  uri:
+    url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}/user/{{ jenkins_admin_username }}/descriptorByName/jenkins.security.ApiTokenProperty/generateNewToken"
+    method: POST
+    user: "{{ jenkins_admin_username }}"
+    password: "{{ jenkins_admin_password }}"
+    force_basic_auth: yes
+    body_format: form-urlencoded
+    body: "newTokenName={{ token_name }}"
+    status_code: 200
+    return_content: yes
+  register: api_token_result
+
 
 - name: Verify API token generation
   debug:
-    msg: "API token was successfully generated {{ api_token_result.output }}"
+    msg: "API token was successfully generated {{ api_token_result.json.data.tokenValue }}"
   when: not jenkins_disable_http | bool and api_token_result is defined and api_token_result.output is defined
 
 - name: Install Jenkins plugins
@@ -134,7 +138,7 @@
     url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}"
     jenkins_home: "{{ jenkins_home }}"
     url_username: "{{ jenkins_admin_username }}"
-    url_password: "{{ api_token_result.output | default('') | trim }}"
+    url_password: "{{ api_token_result.json.data.tokenValue | default('') | trim }}"
     state: present
     with_dependencies: true
     timeout: 180
