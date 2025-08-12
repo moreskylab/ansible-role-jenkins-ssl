@@ -11,6 +11,8 @@
 
 - name: hostnamectl set-hostname
   command: hostnamectl set-hostname {{ jenkins_domain }}
+  become: true
+  when: jenkins_domain is defined and jenkins_domain != ""
 
 - name: re gather facts
   setup:
