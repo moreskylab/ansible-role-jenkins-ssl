@@ -9,6 +9,9 @@ jenkins_group: "jenkins"
 jenkins_http_port: 8080
 jenkins_context_path: ""
 
+# Set domain name
+jenkins_domain: "jenkins.example.com"
+
 # SSL Configuration
 jenkins_enable_ssl: true
 jenkins_https_port: 8443
