@@ -1,4 +1,17 @@
 ---
+
+- name: start jenkins
+  service:
+    name: jenkins
+    state: started
+  listen: "start jenkins"
+
+- name: enable jenkins
+  service:
+    name: jenkins
+    state: enabled
+  listen: "enable jenkins"
+
 - name: restart jenkins
   service:
     name: jenkins

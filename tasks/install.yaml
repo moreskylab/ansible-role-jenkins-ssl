@@ -6,23 +6,38 @@
       name:
         - apt-transport-https
         - ca-certificates
-        - openjdk-21-jdk
+        - openjdk-21-jre
+        - fontconfig
         - curl
         - gnupg
         - python3-full
         - python3-pip
         - python3-jenkins
       state: present
+      update_cache: true
 
-  - name: Add Jenkins repository key (Debian)
-    apt_key:
-      url: "{{ jenkins_repo_key_url }}"
-      state: present
+  - name: Ensure keyrings directory exists
+    ansible.builtin.file:
+      path: /etc/apt/keyrings
+      state: directory
+      mode: '0755'
+      owner: root
+      group: root
 
-  - name: Add Jenkins repository (Debian)
-    apt_repository:
-      repo: "{{ jenkins_repo_url }}"
+  - name: Download Jenkins GPG key
+    ansible.builtin.get_url:
+      url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+      dest: /etc/apt/keyrings/jenkins-keyring.asc
+      mode: '0644'
+      owner: root
+      group: root
+
+  - name: Add Jenkins APT repository
+    ansible.builtin.apt_repository:
+      repo: "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+      filename: jenkins
       state: present
+      update_cache: true
 
   - name: Update (Debian)
     apt:
@@ -33,7 +48,11 @@
     apt:
       name: "jenkins={{ jenkins_version }}"
       state: present
-      update_cache: yes
+      enabled: true
+      update_cache: true
+    notify:
+      - start jenkins
+      - enable jenkins
 
   when: ansible_os_family == "Debian"
 
