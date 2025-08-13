@@ -4,6 +4,7 @@
     name:
       - openssl
       - default-jre
+      - apache2
     state: present
   when: ansible_os_family == "Debian"
 
@@ -12,6 +13,7 @@
     name:
       - openssl
       - java-21-openjdk
+      - httpd
     state: present
   when: ansible_os_family == "RedHat"
 
@@ -136,6 +138,12 @@
       debug:
         msg: "Let's Encrypt certificate challenge result: {{ letsencrypt_cert }}"
 
+    - name: Configure apache for http-01
+      copy:
+        dest: "/var/www/html/{{ letsencrypt_cert['challenge_data'][jenkins_domain]['http-01']['resource'] }}"
+        content: "{{ letsencrypt_cert['challenge_data'][jenkins_domain]['http-01']['resource_value'] }}"
+        when: letsencrypt_cert is changed and 'sample.com' in letsencrypt_cert['challenge_data']
+
     - name: Let the challenge be validated and retrieve the cert and intermediate certificate
       community.crypto.acme_certificate:
         account_key_src: "{{ jenkins_home }}/ssl/letsencrypt_account.key"
@@ -146,6 +154,20 @@
         fullchain_dest: "{{ jenkins_home }}/ssl/jenkins-chain.crt"
         modify_account: false
         data: "{{ letsencrypt_cert }}"
+
+    - name: Remove apache packages
+      package:
+        name:
+          - apache2
+        state: absent
+      when: ansible_os_family == "Debian"
+
+    - name: Install SSL related packages (RedHat)
+      package:
+        name:
+          - httpd
+        state: absent
+      when: ansible_os_family == "RedHat"
 
     - name: Ensure certificate file permissions
       file:
