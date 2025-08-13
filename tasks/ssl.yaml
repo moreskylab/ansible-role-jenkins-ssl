@@ -230,16 +230,40 @@
     mode: 0600
 
 # Configure Jenkins for SSL
-- name: Update Jenkins init file for SSL (Debian)
-  lineinfile:
-    dest: /etc/default/jenkins
-    regexp: "^{{ item.option }}="
-    line: "{{ item.option }}=\"{{ item.value }}\""
-    state: present
-  with_items:
-    - option: "JENKINS_ARGS"
-      value: "--prefix={{ jenkins_context_path }} {% if not jenkins_disable_http %}--httpPort={{ jenkins_http_port }}{% else %}--httpPort=-1{% endif %} --httpsPort={{ jenkins_https_port }} --httpsKeyStore={{ jenkins_ssl_keystore_path }} --httpsKeyStorePassword={{ jenkins_ssl_keystore_password }}"
-  notify: restart jenkins
+- name: Configure Jenkins for SSL
+  block:
+
+    - name: Update Jenkins init file for SSL (Debian)
+      lineinfile:
+        dest: /etc/default/jenkins
+        regexp: "^{{ item.option }}="
+        line: "{{ item.option }}=\"{{ item.value }}\""
+        state: present
+      with_items:
+        - option: "JENKINS_ARGS"
+          value: "--prefix={{ jenkins_context_path }} {% if not jenkins_disable_http %}--httpPort={{ jenkins_http_port }}{% else %}--httpPort=-1{% endif %} --httpsPort={{ jenkins_https_port }} --httpsKeyStore={{ jenkins_ssl_keystore_path }} --httpsKeyStorePassword={{ jenkins_ssl_keystore_password }}"
+      notify: restart jenkins
+      
+
+    - name: Comment out a specific line in a file
+      lineinfile:
+        path: /usr/lib/systemd/system/jenkins.service
+        regexp: "^Environment=\"JENKINS_PORT=8080\""
+        line: "# Environment=\"JENKINS_PORT=8080\""
+        state: present
+
+    - name: Add setting to file
+      blockinfile:
+        path: /usr/lib/systemd/system/jenkins.service
+        block: |
+          Environment="JENKINS_PORT=-1"
+          Environment="JENKINS_HTTPS_PORT=8443"
+          Environment="JENKINS_HTTPS_KEYSTORE=/var/lib/jenkins/jenkins.jks"
+          Environment="JENKINS_HTTPS_KEYSTORE_PASSWORD=changeme"
+        state: present
+        marker: "# {mark} ANSIBLE MANAGED BLOCK FOR MULTIPLE LINES" # Custom marker for identification
+        insertafter: EOF
+
   when: ansible_os_family == "Debian"
 
 - name: Update Jenkins init file for SSL (RedHat)

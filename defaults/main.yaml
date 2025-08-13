@@ -13,7 +13,7 @@ jenkins_context_path: ""
 jenkins_domain: "jenkins.example.com"
 jenkins_token_name: "ansible-token"
 
-# SSL Configuration
+# SSL Configuration\\
 jenkins_enable_ssl: true
 jenkins_https_port: 8443
 jenkins_ssl_keystore_path: "{{ jenkins_home }}/jenkins.jks"
