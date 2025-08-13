@@ -291,6 +291,14 @@
         mode: '0644'
 
     - name: Copy ssl key certificate
+      ansible.builtin.file:
+        path: "/etc/letsencrypt/live/{{ jenkins_domain }}/"
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+
+    - name: Copy ssl key certificate
       ansible.builtin.copy:
         src: "{{ jenkins_home }}/ssl/jenkins.key"
         dest: "/etc/letsencrypt/live/{{ jenkins_domain }}/privkey.key"
