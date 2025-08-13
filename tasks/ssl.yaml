@@ -310,7 +310,7 @@
     - name: Copy ssl chain certificate
       ansible.builtin.copy:
         src: "{{ jenkins_home }}/ssl/jenkins-chain.crt"
-        dest: "/etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.pem"
+        dest: "/etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.crt"
         remote_src: true
         owner: root
         group: root
