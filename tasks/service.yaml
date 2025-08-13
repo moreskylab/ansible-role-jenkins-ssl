@@ -4,15 +4,3 @@
     name: jenkins
     state: restarted
     enabled: yes
-
-- name: Wait for Jenkins HTTPS to start up
-  uri:
-    url: "https://localhost:{{ jenkins_https_port }}{{ jenkins_context_path }}/cli/"
-    status_code: 200
-    timeout: 5
-    validate_certs: false
-  register: result
-  until: result.status == 200
-  retries: 60
-  delay: 1
-  when: jenkins_enable_ssl | bool
