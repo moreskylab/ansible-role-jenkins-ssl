@@ -127,11 +127,9 @@
         csr: "{{ jenkins_home }}/ssl/jenkins.csr"
         dest: "{{ jenkins_home }}/ssl/jenkins.crt"
         fullchain_dest: "{{ jenkins_home }}/ssl/jenkins-chain.crt"
-        modify_account: false
-        # remaining_days: 30
-        # terms_agreed: true
-        # http_01_port: "{{ jenkins_http_port }}"
-        # http_01_bind: "0.0.0.0"
+        # modify_account: false
+        terms_agreed: true
+
       register: letsencrypt_cert
 
     - name: Debug Display acme certificate challenge result
@@ -217,8 +215,8 @@
     -noprompt
   args:
     creates: "{{ jenkins_ssl_keystore_path }}"
-  become: false
-  become_user: "{{ jenkins_user }}"
+  # become: false
+  # become_user: "{{ jenkins_user }}"
   when: jenkins_ssl_cert_strategy in ["selfsigned", "provided", "letsencrypt"]
 
 # Change JKS file ownership to jenkins
@@ -264,6 +262,10 @@
         marker: "# {mark} ANSIBLE MANAGED BLOCK FOR MULTIPLE LINES" # Custom marker for identification
         insertafter: EOF
 
+    - name: Reload systemd
+      command: systemctl daemon-reload
+      notify: restart jenkins
+
     - name: Install nginx
       package:
         name:
@@ -275,7 +277,7 @@
     - name: Copy jenkins templates
       template:
         src: jenkins.conf.j2
-        dest: /etc/nginx/sites-available/jenkins.conf
+        dest: /etc/nginx/conf.d/jenkins.conf
         owner: root
         group: root
         mode: '0644'
@@ -283,7 +285,7 @@
     - name: Copy jenkins templates
       template:
         src: jenkins-ssl.conf.j2
-        dest: /etc/nginx/sites-available/jenkins-ssl.conf
+        dest: /etc/nginx/conf.d/jenkins-ssl.conf
         owner: root
         group: root
         mode: '0644'

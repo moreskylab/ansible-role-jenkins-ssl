@@ -93,60 +93,65 @@
   delay: 5
   until: cli_download is success
 
-- name: Generate API token for admin user
-  jenkins_script:
-    url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}"
-    script: |
-      import jenkins.model.*
-      import hudson.security.*
-      import jenkins.security.*
-      import jenkins.security.apitoken.*
+####
+
+# - name: Generate API token for admin user
+#   jenkins_script:
+#     url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}"
+#     script: |
+#       import jenkins.model.*
+#       import hudson.security.*
+#       import jenkins.security.*
+#       import jenkins.security.apitoken.*
       
-      def user = Jenkins.instance.getSecurityRealm().loadUserByUsername('{{ jenkins_admin_username }}')
-      def tokenStore = user.getProperty(ApiTokenProperty.class)
-      def result = tokenStore.tokenStore.generateNewToken('ansible-token')
-      println(result.plainValue)
-    user: "{{ jenkins_admin_username }}"
-    password: "{{ jenkins_admin_password }}"
-  register: api_token_result
-  when: not jenkins_disable_http | bool
-  no_log: true
-  ignore_errors: true
+#       def user = Jenkins.instance.getSecurityRealm().loadUserByUsername('{{ jenkins_admin_username }}')
+#       def tokenStore = user.getProperty(ApiTokenProperty.class)
+#       def result = tokenStore.tokenStore.generateNewToken('ansible-token')
+#       println(result.plainValue)
+#     user: "{{ jenkins_admin_username }}"
+#     password: "{{ jenkins_admin_password }}"
+#   register: api_token_result
+#   when: not jenkins_disable_http | bool
+#   no_log: true
+#   ignore_errors: true
+#
+# - name: New Generate Create a new Jenkins API token
+#   jenkins_credential:
+#     jenkins_user: "{{ jenkins_admin_username }}"
+#     jenkins_password: "{{ jenkins_admin_password }}"
+#     id: "{{ jenkins_token_name }}"
+#     name: "{{ jenkins_token_name }}"
+#     type: "token"
+#   register: api_token_result
+#   ignore_errors: true
 
-- name: New Generate Create a new Jenkins API token
-  community.general.jenkins_credential:
-    jenkins_user: "{{ jenkins_admin_username }}"
-    jenkins_password: "{{ jenkins_admin_password }}"
-    id: "{{ jenkins_token_name }}"
-    name: "{{ jenkins_token_name }}"
-    type: "token"
-  register: api_token_result
+# - name: Display the generated API token
+#   debug:
+#     msg: "Jenkins API Token for '{{ jenkins_token_name }}': {{ api_token_result.token }}"
 
-- name: Display the generated API token
-  debug:
-    msg: "Jenkins API Token for '{{ jenkins_token_name }}': {{ api_token_result.token }}"
+# - name: Install Jenkins plugins
+#   jenkins_plugin:
+#     name: "{{ item }}"
+#     url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}"
+#     jenkins_home: "{{ jenkins_home }}"
+#     url_username: "{{ jenkins_admin_username }}"
+#     url_password: "{{ jenkins_admin_password }}"
+#     state: present
+#     with_dependencies: true
+#     timeout: 180
+#   with_items: "{{ jenkins_plugins }}"
+#   notify: restart jenkins
+#   ignore_errors: true
+#     #  when: not jenkins_disable_http | bool and api_token_result is defined and api_token_result.output is defined
 
-- name: Install Jenkins plugins
-  jenkins_plugin:
-    name: "{{ item }}"
-    url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}"
-    jenkins_home: "{{ jenkins_home }}"
-    url_username: "{{ jenkins_admin_username }}"
-    url_password: "{{ jenkins_admin_password }}"
-    state: present
-    with_dependencies: true
-    timeout: 180
-  with_items: "{{ jenkins_plugins }}"
-  notify: restart jenkins
-  ignore_errors: true
-    #  when: not jenkins_disable_http | bool and api_token_result is defined and api_token_result.output is defined
-  
-# If token generation fails, add better error reporting
-- name: Check if token generation failed
-  debug:
-    msg: "Failed to generate API token. Will try fallback method."
-  when: not jenkins_disable_http | bool and (api_token_result is not defined or api_token_result.output is not defined)
-  
+# # If token generation fails, add better error reporting
+# - name: Check if token generation failed
+#   debug:
+#     msg: "Failed to generate API token. Will try fallback method."
+#   when: not jenkins_disable_http | bool and (api_token_result is not defined or api_token_result.output is not defined)
+
+####
+
 # Fallback method if the above fails
 - name: Install Jenkins plugins using CLI (fallback)
   command: >
