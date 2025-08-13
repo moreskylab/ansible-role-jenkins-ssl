@@ -255,9 +255,9 @@
         path: /usr/lib/systemd/system/jenkins.service
         block: |
           Environment="JENKINS_PORT=-1"
-          Environment="JENKINS_HTTPS_PORT=8443"
-          Environment="JENKINS_HTTPS_KEYSTORE=/var/lib/jenkins/jenkins.jks"
-          Environment="JENKINS_HTTPS_KEYSTORE_PASSWORD=changeme"
+          Environment="JENKINS_HTTPS_PORT={{ jenkins_https_port }}"
+          Environment="JENKINS_HTTPS_KEYSTORE={{ jenkins_ssl_keystore_path }}"
+          Environment="JENKINS_HTTPS_KEYSTORE_PASSWORD={{ jenkins_ssl_keystore_password }}"
         state: present
         marker: "# {mark} ANSIBLE MANAGED BLOCK FOR MULTIPLE LINES" # Custom marker for identification
         insertafter: EOF
@@ -290,10 +290,26 @@
         group: root
         mode: '0644'
 
-    - name: Generate SSL certificate with Certbot Nginx plugin
-      command: "sudo certbot --nginx -d {{ jenkins_domain }} --register-unsafely-without-email --agree-tos --non-interactive"
-      args:
-        creates: "/etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.pem" # Prevents re-running if cert exists
+    - name: Copy ssl key certificate
+      ansible.builtin.copy:
+        src: "{{ jenkins_home }}/ssl/jenkins.key"
+        dest: "/etc/letsencrypt/live/{{ jenkins_domain }}/privkey.key"
+        owner: root
+        group: root
+        mode: '0600'
+
+    - name: Copy ssl chain certificate
+      ansible.builtin.copy:
+        src: "{{ jenkins_home }}/ssl/jenkins-chain.crt"
+        dest: "/etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.pem"
+        owner: root
+        group: root
+        mode: '0600'
+
+    # - name: Generate SSL certificate with Certbot Nginx plugin
+    #   command: "sudo certbot certonly --nginx -d {{ jenkins_domain }} --register-unsafely-without-email --agree-tos --non-interactive"
+    #   args:
+    #     creates: "/etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.pem" # Prevents re-running if cert exists
 
     - name: restart nginx
       service:
