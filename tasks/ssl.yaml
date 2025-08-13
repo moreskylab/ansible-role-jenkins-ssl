@@ -266,7 +266,10 @@
 
     - name: Install nginx
       package:
-        name: nginx
+        name:
+          - nginx
+          - certbot
+          - python3-certbot-nginx
         state: present
     
     - name: Copy jenkins templates
@@ -284,6 +287,11 @@
         owner: root
         group: root
         mode: '0644'
+
+    - name: Generate SSL certificate with Certbot Nginx plugin
+      command: "sudo certbot --nginx -d {{ jenkins_domain }} --register-unsafely-without-email --agree-tos --non-interactive"
+      args:
+        creates: "/etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.pem" # Prevents re-running if cert exists
 
     - name: restart nginx
       service:
