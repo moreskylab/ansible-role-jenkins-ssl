@@ -48,7 +48,6 @@
     apt:
       name: "jenkins={{ jenkins_version }}"
       state: present
-      enabled: true
       update_cache: true
     notify:
       - start jenkins
