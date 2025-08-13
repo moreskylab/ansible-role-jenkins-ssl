@@ -138,11 +138,12 @@
       debug:
         msg: "Let's Encrypt certificate challenge result: {{ letsencrypt_cert }}"
 
-    - name: Configure apache for http-01
-      lineinfile:
-        dest: "/var/www/html/{{ letsencrypt_cert['challenge_data'][jenkins_domain]['http-01']['resource'] }}"
-        line: "{{ letsencrypt_cert['challenge_data'][jenkins_domain]['http-01']['resource_value'] }}"
-      when: letsencrypt_cert is changed and 'sample.com' in letsencrypt_cert['challenge_data']
+    - name: Copy http-01 challenges
+      ansible.builtin.copy:
+        dest: /var/www/{{ item.key }}/{{ item.value['http-01']['resource'] }}
+        content: "{{ item.value['http-01']['resource_value'] }}"
+      loop: "{{ letsencrypt_cert.challenge_data | dict2items }}"
+      when: letsencrypt_cert is changed
 
     - name: Let the challenge be validated and retrieve the cert and intermediate certificate
       community.crypto.acme_certificate:
