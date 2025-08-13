@@ -139,9 +139,9 @@
         msg: "Let's Encrypt certificate challenge result: {{ letsencrypt_cert }}"
 
     - name: Configure apache for http-01
-      copy:
+      lineinfile:
         dest: "/var/www/html/{{ letsencrypt_cert['challenge_data'][jenkins_domain]['http-01']['resource'] }}"
-        content: "{{ letsencrypt_cert['challenge_data'][jenkins_domain]['http-01']['resource_value'] }}"
+        line: "{{ letsencrypt_cert['challenge_data'][jenkins_domain]['http-01']['resource_value'] }}"
       when: letsencrypt_cert is changed and 'sample.com' in letsencrypt_cert['challenge_data']
 
     - name: Let the challenge be validated and retrieve the cert and intermediate certificate
