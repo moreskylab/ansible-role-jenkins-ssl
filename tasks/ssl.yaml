@@ -264,7 +264,35 @@
         marker: "# {mark} ANSIBLE MANAGED BLOCK FOR MULTIPLE LINES" # Custom marker for identification
         insertafter: EOF
 
+    - name: Install nginx
+      package:
+        name: nginx
+        state: present
+    
+    - name: Copy jenkins templates
+      template:
+        src: jenkins.conf.j2
+        dest: /etc/nginx/sites-available/jenkins.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Copy jenkins templates
+      template:
+        src: jenkins-ssl.conf.j2
+        dest: /etc/nginx/sites-available/jenkins-ssl.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: restart nginx
+      service:
+        name: nginx
+        state: restarted
+
+  notify: restart jenkins
   when: ansible_os_family == "Debian"
+
 
 - name: Update Jenkins init file for SSL (RedHat)
   lineinfile:
