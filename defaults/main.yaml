@@ -11,6 +11,7 @@ jenkins_context_path: ""
 
 # Set domain name
 jenkins_domain: "jenkins.example.com"
+jenkins_token_name: "ansible-token"
 
 # SSL Configuration
 jenkins_enable_ssl: true

@@ -11,7 +11,7 @@
   package:
     name:
       - openssl
-      - java-11-openjdk
+      - java-21-openjdk
     state: present
   when: ansible_os_family == "RedHat"
 
@@ -112,11 +112,11 @@
       openssl_csr:
         path: "{{ jenkins_home }}/ssl/jenkins.csr"
         privatekey_path: "{{ jenkins_home }}/ssl/jenkins.key"
-        common_name: "{{ jenkins_letsencrypt_domain }}"
+        common_name: "{{ jenkins_domain }}"
         owner: "{{ jenkins_user }}"
         group: "{{ jenkins_group }}"
 
-    - name: Obtain Let's Encrypt certificate
+    - name: Create a challenge for jenkins.altgr.in
       community.crypto.acme_certificate:
         account_key_src: "{{ jenkins_home }}/ssl/letsencrypt_account.key"
         acme_directory: "https://acme-v02.api.letsencrypt.org/directory"
@@ -125,11 +125,27 @@
         csr: "{{ jenkins_home }}/ssl/jenkins.csr"
         dest: "{{ jenkins_home }}/ssl/jenkins.crt"
         fullchain_dest: "{{ jenkins_home }}/ssl/jenkins-chain.crt"
-        remaining_days: 30
-        terms_agreed: true
-        http_01_port: "{{ jenkins_http_port }}"
-        http_01_bind: "0.0.0.0"
+        modify_account: false
+        # remaining_days: 30
+        # terms_agreed: true
+        # http_01_port: "{{ jenkins_http_port }}"
+        # http_01_bind: "0.0.0.0"
       register: letsencrypt_cert
+
+    - name: Debug Display acme certificate challenge result
+      debug:
+        msg: "Let's Encrypt certificate challenge result: {{ letsencrypt_cert }}"
+
+    - name: Let the challenge be validated and retrieve the cert and intermediate certificate
+      community.crypto.acme_certificate:
+        account_key_src: "{{ jenkins_home }}/ssl/letsencrypt_account.key"
+        acme_directory: "https://acme-v02.api.letsencrypt.org/directory"
+        acme_version: 2
+        csr: "{{ jenkins_home }}/ssl/jenkins.csr"
+        dest: "{{ jenkins_home }}/ssl/jenkins.crt"
+        fullchain_dest: "{{ jenkins_home }}/ssl/jenkins-chain.crt"
+        modify_account: false
+        data: "{{ letsencrypt_cert }}"
 
     - name: Ensure certificate file permissions
       file:

@@ -113,24 +113,18 @@
   no_log: true
   ignore_errors: true
 
-- name: New Generate new API token
-  uri:
-    url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}/user/{{ jenkins_admin_username }}/descriptorByName/jenkins.security.ApiTokenProperty/generateNewToken"
-    method: POST
-    user: "{{ jenkins_admin_username }}"
-    password: "{{ jenkins_admin_password }}"
-    force_basic_auth: yes
-    body_format: form-urlencoded
-    body: "newTokenName={{ token_name }}"
-    status_code: 200
-    return_content: yes
+- name: New Generate Create a new Jenkins API token
+  community.general.jenkins_credential:
+    jenkins_user: "{{ jenkins_admin_username }}"
+    jenkins_password: "{{ jenkins_admin_password }}"
+    id: "{{ jenkins_token_name }}"
+    name: "{{ jenkins_token_name }}"
+    type: "token"
   register: api_token_result
 
-
-- name: Verify API token generation
+- name: Display the generated API token
   debug:
-    msg: "API token was successfully generated {{ api_token_result.json.data.tokenValue }}"
-  when: not jenkins_disable_http | bool and api_token_result is defined and api_token_result.output is defined
+    msg: "Jenkins API Token for '{{ jenkins_token_name }}': {{ api_token_result.token }}"
 
 - name: Install Jenkins plugins
   jenkins_plugin:
@@ -138,14 +132,14 @@
     url: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}"
     jenkins_home: "{{ jenkins_home }}"
     url_username: "{{ jenkins_admin_username }}"
-    url_password: "{{ api_token_result.json.data.tokenValue | default('') | trim }}"
+    url_password: "{{ jenkins_admin_password }}"
     state: present
     with_dependencies: true
     timeout: 180
   with_items: "{{ jenkins_plugins }}"
   notify: restart jenkins
   ignore_errors: true
-  when: not jenkins_disable_http | bool and api_token_result is defined and api_token_result.output is defined
+    #  when: not jenkins_disable_http | bool and api_token_result is defined and api_token_result.output is defined
   
 # If token generation fails, add better error reporting
 - name: Check if token generation failed
