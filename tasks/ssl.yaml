@@ -138,10 +138,16 @@
       debug:
         msg: "Let's Encrypt certificate challenge result: {{ letsencrypt_cert }}"
 
+    - name: Ensure .well-known/acme-challenge directory exists
+      file:
+        path: "/var/www/html/.well-known/acme-challenge"
+        state: directory
+
     - name: Copy http-01 challenges
       ansible.builtin.copy:
-        dest: /var/www/{{ item.key }}/{{ item.value['http-01']['resource'] }}
+        dest: /var/www/html/{{ item.value['http-01']['resource'] }}
         content: "{{ item.value['http-01']['resource_value'] }}"
+        force: true
       loop: "{{ letsencrypt_cert.challenge_data | dict2items }}"
       when: letsencrypt_cert is changed
 
@@ -180,6 +186,8 @@
         - "{{ jenkins_home }}/ssl/jenkins.crt"
         - "{{ jenkins_home }}/ssl/jenkins-chain.crt"
   when: jenkins_ssl_cert_strategy == "letsencrypt"
+  tags:
+    - ssl
 
 # Convert certificate to PKCS12 format
 - name: Convert certificate to PKCS12
@@ -209,7 +217,7 @@
     -noprompt
   args:
     creates: "{{ jenkins_ssl_keystore_path }}"
-  become: true
+  become: false
   become_user: "{{ jenkins_user }}"
   when: jenkins_ssl_cert_strategy in ["selfsigned", "provided", "letsencrypt"]
 
