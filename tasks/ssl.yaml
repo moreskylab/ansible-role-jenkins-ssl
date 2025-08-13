@@ -221,6 +221,14 @@
   become_user: "{{ jenkins_user }}"
   when: jenkins_ssl_cert_strategy in ["selfsigned", "provided", "letsencrypt"]
 
+# Change JKS file ownership to jenkins
+- name: Change JKS file ownership
+  file:
+    path: "{{ jenkins_ssl_keystore_path }}"
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+    mode: 0600
+
 # Configure Jenkins for SSL
 - name: Update Jenkins init file for SSL (Debian)
   lineinfile:

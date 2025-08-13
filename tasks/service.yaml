@@ -2,7 +2,7 @@
 - name: Ensure Jenkins is started and enabled
   service:
     name: jenkins
-    state: started
+    state: restarted
     enabled: yes
 
 - name: Wait for Jenkins HTTPS to start up
