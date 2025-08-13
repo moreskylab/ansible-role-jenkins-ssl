@@ -247,7 +247,7 @@
       lineinfile:
         path: /usr/lib/systemd/system/jenkins.service
         regexp: "^Environment=\"JENKINS_PORT=8080\""
-        line: "# Environment=\"JENKINS_PORT=8080\""
+        line: "#Environment=\"JENKINS_PORT=8080\""
         state: present
 
     - name: Add setting to file
@@ -260,7 +260,7 @@
           Environment="JENKINS_HTTPS_KEYSTORE_PASSWORD={{ jenkins_ssl_keystore_password }}"
         state: present
         marker: "# {mark} ANSIBLE MANAGED BLOCK FOR MULTIPLE LINES" # Custom marker for identification
-        insertafter: EOF
+        insertafter: "#Environment=\"JENKINS_PORT=8080\""
 
     - name: Reload systemd
       command: systemctl daemon-reload
@@ -302,7 +302,7 @@
       ansible.builtin.copy:
         src: "{{ jenkins_home }}/ssl/jenkins.key"
         dest: "/etc/letsencrypt/live/{{ jenkins_domain }}/privkey.key"
-        remote_src: yes
+        remote_src: true
         owner: root
         group: root
         mode: '0600'
@@ -311,7 +311,7 @@
       ansible.builtin.copy:
         src: "{{ jenkins_home }}/ssl/jenkins-chain.crt"
         dest: "/etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.pem"
-        remote_src: yes
+        remote_src: true
         owner: root
         group: root
         mode: '0600'
