@@ -3,7 +3,7 @@
   become: true
   become_method: sudo
   vars:
-    - jenkins_domain: "jenkins.altgr.in"
+    - jenkins_domain: "myjenkins.altgr.in"
   vars_files:
     - vars/vault.yml
   roles:
